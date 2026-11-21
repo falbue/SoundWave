@@ -67,7 +67,6 @@ class SoundCloud:
         self.session_file = session_file or Path.home() / '.local/share/sound-wave/session.json'
         self.http = None
         self.user_id = None
-        self.user = None
 
     @property
     def has_saved_session(self):
@@ -75,17 +74,12 @@ class SoundCloud:
 
     def connect(self, value):
         self._authorize(read_token(value), save=True)
-        return self.user
-
-    def profile(self):
-        self._ensure_session()
-        return self.user
 
     def sign_out(self):
         self.session_file.unlink(missing_ok=True)
         if self.http:
             self.http.close()
-        self.http = self.user_id = self.user = None
+        self.http = self.user_id = None
 
     def _authorize(self, token, *, save=False):
         candidate = requests.Session()
@@ -99,7 +93,7 @@ class SoundCloud:
                 'Origin': SITE,
                 'Referer': SITE + '/',
             })
-            user = self._request(candidate, 'GET', '/me', action='проверка входа')
+            user = self._get(candidate, '/me', action='проверка входа')
             user_id = user['id']
             if save:
                 self._save_session({'token': token})
@@ -109,7 +103,7 @@ class SoundCloud:
 
         if self.http:
             self.http.close()
-        self.http, self.user_id, self.user = candidate, user_id, user
+        self.http, self.user_id = candidate, user_id
 
     def _save_session(self, data):
         self.session_file.parent.mkdir(parents=True, exist_ok=True)
@@ -128,35 +122,35 @@ class SoundCloud:
         if response.status_code >= 400:
             raise SoundCloudHTTPError(response.status_code, action)
 
-    def _request(self, http, method, path, *, action, **params):
-        response = http.request(method, self.api_url + path, params=params, timeout=20)
+    def _get(self, http, path, *, action, **params):
+        response = http.get(self.api_url + path, params=params, timeout=20)
         self._check(response, action)
         return response.json() if response.content else None
 
-    def _ensure_session(self):
+    def restore_session(self):
         if self.http is None:
             if not self.session_file.exists():
                 raise SoundCloudError('Войди в SoundCloud')
             saved = json.loads(self.session_file.read_text())
             self._authorize(saved['token'])
 
-    def request(self, method, path, *, action, **params):
-        self._ensure_session()
-        return self._request(self.http, method, path, action=action, **params)
+    def get(self, path, *, action, **params):
+        self.restore_session()
+        return self._get(self.http, path, action=action, **params)
 
     def _collection(self, path, action, *, limit=50, all_pages=False):
-        data = self.request('GET', path, action=action, limit=limit, linked_partitioning=1)
+        data = self.get(path, action=action, limit=limit, linked_partitioning=1)
         items = data['collection']
         while all_pages and (next_page := data.get('next_href')):
             if not next_page.startswith(self.api_url + '/'):
                 break
             page = urlsplit(next_page)
-            data = self.request('GET', page.path, action=action, **dict(parse_qsl(page.query)))
+            data = self.get(page.path, action=action, **dict(parse_qsl(page.query)))
             items.extend(data['collection'])
         return items
 
     def likes(self):
-        self._ensure_session()
+        self.restore_session()
         items = self._collection(f'/users/{self.user_id}/likes', 'загрузка лайков', limit=200, all_pages=True)
         return [item['track'] for item in items if item.get('track')]
 
@@ -184,30 +178,5 @@ class SoundCloud:
         log.debug('Формат трека %s: %s', track_key, best['format']['protocol'])
         authorization = track.get('track_authorization')
         params = {'track_authorization': authorization} if authorization else {}
-        stream = self.request('GET', best['url'].removeprefix(API), action=GET_AUDIO, **params)
+        stream = self.get(best['url'].removeprefix(API), action=GET_AUDIO, **params)
         return stream.get('url') if isinstance(stream, dict) else None
-
-    def play_history_job(self, track):
-        if self.http is None:
-            return None
-        urn = track_urn(track)
-        # Keep this play tied to the account that was active when it started.
-        headers = self.http.headers.copy()
-        params = self.http.params.copy()
-        cookies = self.http.cookies.copy()
-
-        def send():
-            try:
-                with requests.Session() as http:
-                    response = http.post(API + '/me/play-history', headers=headers, params=params,
-                                         cookies=cookies, json={'track_urn': urn},
-                                         timeout=8, allow_redirects=False)
-                    log_http(response, 'запись истории прослушивания')
-                    if not 200 <= response.status_code < 300:
-                        return
-            except requests.RequestException as error:
-                log.debug('Не удалось записать историю для %s: %s', urn, type(error).__name__)
-                return
-            log.debug('SoundCloud записал прослушивание трека %s', urn)
-
-        return send

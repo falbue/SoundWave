@@ -39,7 +39,7 @@ class OAuthSoundCloud(SoundCloud):
         if not token:
             raise SoundCloudError('Вставь refresh-токен SoundCloud')
         self._refresh(token)
-        return self.profile()
+        self.restore_session()
 
     def _refresh(self, refresh_token):
         response = self.http.post(TOKEN_URL, data={
@@ -73,12 +73,12 @@ class OAuthSoundCloud(SoundCloud):
         if time.time() >= self.tokens['expires_at'] - 30:
             self._refresh(self.tokens['refresh_token'])
 
-    def _send(self, method, url, *, action, params=None, stream=False):
+    def _get_response(self, url, *, action, params=None, stream=False):
         self._ensure_tokens()
 
         def send():
-            return self.http.request(method, url, params=params, timeout=20, stream=stream,
-                                     headers={'Authorization': f"OAuth {self.tokens['access_token']}"})
+            return self.http.get(url, params=params, timeout=20, stream=stream,
+                                 headers={'Authorization': f"OAuth {self.tokens['access_token']}"})
 
         response = send()
         if response.status_code == 401:
@@ -93,12 +93,12 @@ class OAuthSoundCloud(SoundCloud):
             raise
         return response
 
-    def request(self, method, path, *, action, **params):
-        with self._send(method, self.api_url + path, action=action, params=params) as response:
+    def get(self, path, *, action, **params):
+        with self._get_response(self.api_url + path, action=action, params=params) as response:
             return response.json() if response.content else None
 
-    def profile(self):
-        return self.request('GET', '/me', action='проверка входа')
+    def restore_session(self):
+        self.get('/me', action='проверка входа')
 
     def sign_out(self):
         super().sign_out()
@@ -111,21 +111,17 @@ class OAuthSoundCloud(SoundCloud):
     def recommendations(self, seed, station):
         if station:
             station_id = seed.get('station_urn') or f"track-stations:{track_urn(seed).split(':')[-1]}"
-            playlist = self.request('GET', f'/system-playlists/{station_id}', action=LOAD_STATION)
+            playlist = self.get(f'/system-playlists/{station_id}', action=LOAD_STATION)
             return playlist['tracks']
         return self._collection(f'/tracks/{track_urn(seed)}/related', LOAD_RELATED)
 
     def stream(self, track):
-        streams = self.request('GET', f'/tracks/{track_urn(track)}/streams', action=GET_AUDIO)
+        streams = self.get(f'/tracks/{track_urn(track)}/streams', action=GET_AUDIO)
         url = streams.get('hls_aac_160_url') or streams.get('hls_mp3_128_url')
         if not url or not url.startswith(API + '/'):
             return None
-        with self._send('GET', url, action=OPEN_AUDIO, stream=True) as response:
+        with self._get_response(url, action=OPEN_AUDIO, stream=True) as response:
             destination = urlsplit(response.url)
             if destination.scheme == 'https' and (destination.hostname or '').endswith('.sndcdn.com'):
                 return response.url
-        return None
-
-    def play_history_job(self, track):
-        # The public API only exposes GET /me/recently-played/tracks.
         return None

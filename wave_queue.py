@@ -17,10 +17,9 @@ class Wave:
         self.station = None
 
     def connect(self, value):
-        profile = self.api.connect(value)
+        self.api.connect(value)
         self.seeds.clear()
         self.reset()
-        return profile
 
     def sign_out(self):
         self.api.sign_out()

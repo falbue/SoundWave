@@ -122,8 +122,6 @@ class Window(Gtk.ApplicationWindow):
         self.playback_generation = 0
         self.playing = False
         self.playback_failures = 0
-        self.history_timer = None
-        self.history_recorded = False
         self.pointer_watch = None
         self.debug = debug_enabled()
         self.player = Gst.ElementFactory.make("playbin")
@@ -387,7 +385,7 @@ class Window(Gtk.ApplicationWindow):
 
     def restore_login(self):
         self.login_feedback("Проверяем сохранённый вход…")
-        self.run("login", self.wave.api.profile, self.show_player, self.login_feedback)
+        self.run("login", self.wave.api.restore_session, self.show_player, self.login_feedback)
 
     def submit_login(self, *_):
         if "login" in self.pending_jobs:
@@ -421,12 +419,12 @@ class Window(Gtk.ApplicationWindow):
         if self.track or ("track", self.playback_generation) in self.pending_jobs:
             self.next_track()
 
-    def connected(self, profile):
+    def connected(self, _result):
         self.request_stop()
-        self.show_player(profile)
+        self.show_player()
         self.set_status("SoundCloud подключён")
 
-    def show_player(self, _profile):
+    def show_player(self, _result=None):
         self.signed_in = True
         self.login_feedback("")
         self.token_entry.set_text("")
@@ -579,7 +577,6 @@ class Window(Gtk.ApplicationWindow):
         self.update_controls()
 
     def stop_playback(self):
-        self.cancel_history_timer()
         self.player.set_state(Gst.State.NULL)
         self.media.reset_stream()
         self.track = None
@@ -590,8 +587,6 @@ class Window(Gtk.ApplicationWindow):
 
     def show_track(self, result, *, autoplay=True):
         track, url = result
-        self.cancel_history_timer()
-        self.history_recorded = False
         self.track = track
         log.debug("Открытие потока в GStreamer: трек %s", track_urn(track))
         self.player.set_state(Gst.State.NULL)
@@ -614,8 +609,6 @@ class Window(Gtk.ApplicationWindow):
             self.request_next_track()
         else:
             self.playing = not self.playing
-            if not self.playing:
-                self.cancel_history_timer()
             self.player.set_state(
                 Gst.State.PLAYING if self.playing else Gst.State.PAUSED
             )
@@ -629,38 +622,9 @@ class Window(Gtk.ApplicationWindow):
     def on_close(self, *_):
         self.closed = True
         self.jobs.clear()
-        self.cancel_history_timer()
         self.player.set_state(Gst.State.NULL)
         self.media.close()
         return False
-
-    def cancel_history_timer(self):
-        if self.history_timer is not None:
-            GLib.source_remove(self.history_timer)
-            self.history_timer = None
-
-    def watch_play_history(self):
-        if self.history_recorded or self.history_timer is not None:
-            return
-
-        def check_position():
-            available, position = self.player.query_position(Gst.Format.TIME)
-            if not available or position < Gst.SECOND:
-                return GLib.SOURCE_CONTINUE
-            self.history_timer = None
-            self.record_play()
-            return GLib.SOURCE_REMOVE
-
-        self.history_timer = GLib.timeout_add(250, check_position)
-
-    def record_play(self):
-        self.cancel_history_timer()
-        if self.history_recorded or self.track is None:
-            return
-        self.history_recorded = True
-        job = self.wave.api.play_history_job(self.track)
-        if job is not None:
-            threading.Thread(target=job, daemon=True).start()
 
     def on_message(self, _bus, message):
         if not self.track:
@@ -677,13 +641,7 @@ class Window(Gtk.ApplicationWindow):
                 log.debug(
                     "GStreamer начал воспроизведение трека %s", track_urn(self.track)
                 )
-                if self.playing:
-                    self.watch_play_history()
-            else:
-                self.cancel_history_timer()
         elif message.type == Gst.MessageType.EOS:
-            if self.history_timer is not None:
-                self.record_play()
             self.playback_failures = 0
             self.advance_track()
         elif message.type == Gst.MessageType.ERROR:
