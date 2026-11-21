@@ -1,0 +1,29 @@
+services:
+  wave:
+    build: .
+    image: sound-wave
+    init: true
+    network_mode: host
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    environment:
+      DEBUG: "${DEBUG:-False}"
+      SOUND_WAVE_LOG_DIR: /project/logs
+      HOME: /tmp
+      GDK_BACKEND: wayland
+      WAYLAND_DISPLAY: ${WAYLAND_DISPLAY:-wayland-0}
+      XDG_RUNTIME_DIR: ${XDG_RUNTIME_DIR:?Run Compose from your Wayland session}
+      DBUS_SESSION_BUS_ADDRESS: unix:path=${XDG_RUNTIME_DIR}/bus
+      SOUNDCLOUD_CLIENT_ID: ${SOUNDCLOUD_CLIENT_ID:-}
+      SOUNDCLOUD_CLIENT_SECRET: ${SOUNDCLOUD_CLIENT_SECRET:-}
+    volumes:
+      - type: bind
+        source: .
+        target: /project
+      - type: bind
+        source: ${XDG_RUNTIME_DIR}
+        target: ${XDG_RUNTIME_DIR}
+      - type: bind
+        source: ${HOME}/.local/share/sound-wave
+        target: /tmp/.local/share/sound-wave
+        bind:
+          create_host_path: false
