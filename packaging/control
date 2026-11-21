@@ -1,0 +1,8 @@
+Package: soundwave
+Section: sound
+Priority: optional
+Architecture: all
+Maintainer: falbue
+Depends: python3, python3-gi, python3-requests, gir1.2-gtk-4.0 (>= 4.12), gir1.2-adw-1 (>= 1.2), gir1.2-gstreamer-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, gstreamer1.0-libav, ca-certificates
+Description: Плеер для SoundCloud
+ Компактный GTK-плеер для станций и рекомендаций SoundCloud

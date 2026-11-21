@@ -1,0 +1,48 @@
+name: Build and release SoundWave
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-tags:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check release tag
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            printf 'version=%s\n' "${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-release:
+    needs: check-tags
+    if: needs.check-tags.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Debian package
+        env:
+          VERSION: ${{ needs.check-tags.outputs.version }}
+        run: |
+          docker build --build-arg VERSION="$VERSION" --output dist .
+          dpkg-deb --info dist/*.deb
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.deb --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.deb --verify-tag --generate-notes
+          fi

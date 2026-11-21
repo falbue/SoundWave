@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SoundWave
+Comment=Listen to SoundCloud stations and recommendations
+Comment[ru]=Слушайте станции и рекомендации SoundCloud
+Exec=soundwave
+Icon=ru.falbue.SoundWave
+Categories=AudioVideo;Audio;Player;
+Terminal=false

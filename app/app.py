@@ -7,10 +7,9 @@ import requests
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gst", "1.0")
-from gi.repository import Adw, Gio, GLib, Gst, Gtk
-
 from artwork import fetch_image, texture
 from diagnostics import configure_debug, debug_enabled, log
+from gi.repository import Adw, Gio, GLib, Gst, Gtk
 from mpris import MediaControls
 from oauth_soundcloud import OAuthSoundCloud, soundcloud_client
 from soundcloud import SoundCloudError, track_urn
@@ -108,8 +107,12 @@ class ScrollingLabel(Gtk.ScrolledWindow):
 class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(
-            application=app, title="SoundWave", decorated=False, resizable=False,
-            default_width=WINDOW_SIZE, default_height=WINDOW_SIZE,
+            application=app,
+            title="SoundWave",
+            decorated=False,
+            resizable=False,
+            default_width=WINDOW_SIZE,
+            default_height=WINDOW_SIZE,
         )
         self.add_css_class("wave-window")
         self.wave = Wave(soundcloud_client())
@@ -137,8 +140,13 @@ class Window(Gtk.ApplicationWindow):
         self.screen.add_named(self.build_player(), "player")
         self.screen.add_named(self.build_login(), "login")
         self.frame.add_overlay(self.screen)
-        self.status = Gtk.Label(wrap=True, valign=Gtk.Align.START, margin_top=44,
-                                can_target=False, visible=False)
+        self.status = Gtk.Label(
+            wrap=True,
+            valign=Gtk.Align.START,
+            margin_top=44,
+            can_target=False,
+            visible=False,
+        )
         self.status.add_css_class("wave-status")
         self.frame.add_overlay(self.status)
         self.header = self.build_header()
@@ -171,8 +179,11 @@ class Window(Gtk.ApplicationWindow):
         cover_button.connect("clicked", self.on_play)
         artwork.set_child(cover_button)
         self.cover_placeholder = Gtk.Image(
-            icon_name="audio-x-generic-symbolic", pixel_size=54,
-            halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER, can_target=False,
+            icon_name="audio-x-generic-symbolic",
+            pixel_size=54,
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER,
+            can_target=False,
         )
         self.cover_placeholder.add_css_class("dim-label")
         artwork.add_overlay(self.cover_placeholder)
@@ -180,14 +191,16 @@ class Window(Gtk.ApplicationWindow):
         shade = Gtk.Box()
         shade.add_css_class("wave-shade")
         self.shade = Gtk.Revealer(
-            child=shade, can_target=False,
+            child=shade,
+            can_target=False,
             transition_type=Gtk.RevealerTransitionType.CROSSFADE,
             transition_duration=200,
         )
         artwork.add_overlay(self.shade)
 
-        self.details = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2,
-                               valign=Gtk.Align.END)
+        self.details = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=2, valign=Gtk.Align.END
+        )
         self.details.add_css_class("wave-details")
         self.title_label = ScrollingLabel("Твоя волна", "heading")
         self.title_label.set_can_target(False)
@@ -199,8 +212,9 @@ class Window(Gtk.ApplicationWindow):
         self.artist_label = ScrollingLabel("Музыка на основе твоих лайков", "dim-label")
         self.details.append(self.artist_label)
         artwork.add_overlay(self.details)
-        controls = Gtk.CenterBox(margin_start=10, margin_end=10,
-                                 valign=Gtk.Align.CENTER)
+        controls = Gtk.CenterBox(
+            margin_start=10, margin_end=10, valign=Gtk.Align.CENTER
+        )
         controls.add_css_class("wave-controls")
         self.track_link = Gtk.LinkButton(
             uri="",
@@ -248,17 +262,28 @@ class Window(Gtk.ApplicationWindow):
         seat = self.get_display().get_default_seat()
         pointer = seat.get_pointer() if seat else None
         pointer_inside = (
-            surface is not None and pointer is not None
+            surface is not None
+            and pointer is not None
             and pointer.get_surface_at_position()[0] == surface
         )
-        show_chrome = not self.signed_in or not self.track or pointer_inside or self.mode.get_active()
+        show_chrome = (
+            not self.signed_in
+            or not self.track
+            or pointer_inside
+            or self.mode.get_active()
+        )
         for widget in (self.header, self.details, self.transport):
             widget.set_opacity(float(show_chrome))
         self.shade.set_reveal_child(
-            self.signed_in and show_chrome and (self.track is not None or bool(self.status.get_text()))
+            self.signed_in
+            and show_chrome
+            and (self.track is not None or bool(self.status.get_text()))
         )
         self.status.set_visible(
-            self.debug and self.signed_in and show_chrome and bool(self.status.get_text())
+            self.debug
+            and self.signed_in
+            and show_chrome
+            and bool(self.status.get_text())
         )
         if self.track and show_chrome and self.pointer_watch is None:
             # Resizing while a popover closes can suppress the pointer leave event.
@@ -320,7 +345,9 @@ class Window(Gtk.ApplicationWindow):
         self.login.connect("clicked", self.submit_login)
         form.append(self.login)
         return Gtk.ScrolledWindow(
-            child=form, hscrollbar_policy=Gtk.PolicyType.NEVER, margin_top=46,
+            child=form,
+            hscrollbar_policy=Gtk.PolicyType.NEVER,
+            margin_top=46,
         )
 
     def build_header(self):
@@ -351,8 +378,10 @@ class Window(Gtk.ApplicationWindow):
         account_actions.append("Выйти из SoundCloud", "win.logout")
         menu.append_section(None, account_actions)
         self.mode = Gtk.MenuButton(
-            icon_name="open-menu-symbolic", has_frame=False,
-            tooltip_text="Меню SoundWave", menu_model=menu,
+            icon_name="open-menu-symbolic",
+            has_frame=False,
+            tooltip_text="Меню SoundWave",
+            menu_model=menu,
         )
         self.mode.connect("notify::active", self.reveal_controls)
         self.mode.update_property([Gtk.AccessibleProperty.LABEL], ["Меню SoundWave"])
@@ -360,8 +389,9 @@ class Window(Gtk.ApplicationWindow):
         title = Gtk.Label(label="SoundWave")
         title.add_css_class("heading")
         header.set_center_widget(Gtk.WindowHandle(child=title, hexpand=True))
-        close = Gtk.Button(icon_name="window-close-symbolic", has_frame=False,
-                           tooltip_text="Закрыть")
+        close = Gtk.Button(
+            icon_name="window-close-symbolic", has_frame=False, tooltip_text="Закрыть"
+        )
         close.connect("clicked", lambda *_: self.close())
         header.set_end_widget(close)
         return header
@@ -385,7 +415,12 @@ class Window(Gtk.ApplicationWindow):
 
     def restore_login(self):
         self.login_feedback("Проверяем сохранённый вход…")
-        self.run("login", self.wave.api.restore_session, self.show_player, self.login_feedback)
+        self.run(
+            "login",
+            self.wave.api.restore_session,
+            self.show_player,
+            self.login_feedback,
+        )
 
     def submit_login(self, *_):
         if "login" in self.pending_jobs:
@@ -634,7 +669,9 @@ class Window(Gtk.ApplicationWindow):
             self.media.seek_done()
         elif message.type == Gst.MessageType.DURATION_CHANGED:
             self.media.stream_changed()
-        elif message.type == Gst.MessageType.STATE_CHANGED and message.src == self.player:
+        elif (
+            message.type == Gst.MessageType.STATE_CHANGED and message.src == self.player
+        ):
             _, state, _ = message.parse_state_changed()
             if state == Gst.State.PLAYING:
                 self.playback_failures = 0

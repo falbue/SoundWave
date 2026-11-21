@@ -1,3 +1,2 @@
-# In Docker this requirement is satisfied by Debian's python3-gi.
 PyGObject>=3.50,<4
 requests==2.34.2

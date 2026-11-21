@@ -1,5 +1,4 @@
 from gi.repository import Gio, GLib, Gst
-
 from soundcloud import track_urn
 
 ROOT = "org.mpris.MediaPlayer2"
@@ -132,7 +131,9 @@ class MediaControls:
 
     def seek(self, position):
         if self.window.player.seek_simple(
-            Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE, position * 1000
+            Gst.Format.TIME,
+            Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+            position * 1000,
         ):
             self.seek_pending = True
 
@@ -141,7 +142,11 @@ class MediaControls:
             self.seek_pending = False
             if self.connection:
                 self.connection.emit_signal(
-                    None, PATH, PLAYER, "Seeked", GLib.Variant("(x)", (self.position(),))
+                    None,
+                    PATH,
+                    PLAYER,
+                    "Seeked",
+                    GLib.Variant("(x)", (self.position(),)),
                 )
 
     def metadata(self):
